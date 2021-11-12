@@ -2798,20 +2798,38 @@ error_out:
 	return -1;
 }
 
+static int restore_send_bootability_bundle_data(restored_client_t restore, struct idevicerestore_client_t* client, plist_t build_identity, plist_t message)
+{
+	if (idevicerestore_debug) {
+		debug("DEBUG: %s: Got BootabilityBundle request:\n", __func__);
+		debug_plist(build_identity);
+		debug_plist(message);
+	}
+
+	return 0;
+}
+
 plist_t restore_get_build_identity(struct idevicerestore_client_t* client, uint8_t is_recover_os)
 {
 	unsigned int size = 0;
 	unsigned char* data = NULL;
+	const char *variant;
 	plist_t buildmanifest = NULL;
 	ipsw_extract_to_memory(client->ipsw, "BuildManifest.plist", &data, &size);
 	plist_from_xml((char*)data, size, &buildmanifest);
 	free(data);
 
-	plist_t build_identity = build_manifest_get_build_identity_for_model_with_restore_behavior_and_global_signing(
+	if (is_recover_os)
+		variant = "macOS Customer";
+	else if (client->flags & FLAG_ERASE)
+		variant = "Customer Erase Install (IPSW)";
+	else
+		variant = "Customer Upgrade Install (IPSW)";
+
+	plist_t build_identity = build_manifest_get_build_identity_for_model_with_variant(
 			buildmanifest,
 			client->device->hardware_model,
-			client->flags & FLAG_ERASE ? "Erase": "Update",
-			is_recover_os);
+			variant);
 
 	plist_t unique_id_node = plist_dict_get_item(buildmanifest, "UniqueBuildID");
 	debug_plist(unique_id_node);
@@ -3351,6 +3369,13 @@ int restore_handle_data_request_msg(struct idevicerestore_client_t* client, idev
 			}
 		}
 
+		else if (!strcmp(type, "BootabilityBundle")) {
+			if(restore_send_bootability_bundle_data(restore, client, build_identity, message) < 0) {
+				error("ERROR: Unable to send BootabilityBundle data\n");
+				return -1;
+			}
+		}
+
 		else {
 			// Unknown DataType!!
 			error("Unknown data request '%s' received\n", type);
@@ -3369,6 +3394,7 @@ plist_t restore_supported_data_types()
 	plist_dict_set_item(dict, "BasebandData", plist_new_bool(0));
 	plist_dict_set_item(dict, "BasebandStackData", plist_new_bool(0));
 	plist_dict_set_item(dict, "BasebandUpdaterOutputData", plist_new_bool(0));
+	plist_dict_set_item(dict, "BootabilityBundle", plist_new_bool(0));
 	plist_dict_set_item(dict, "BuildIdentityDict", plist_new_bool(0));
 	plist_dict_set_item(dict, "BuildIdentityDictV2", plist_new_bool(0));
 	plist_dict_set_item(dict, "DataType", plist_new_bool(0));
