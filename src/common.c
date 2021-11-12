@@ -73,6 +73,7 @@ static char idevicerestore_err_buff[idevicerestore_err_buff_size] = {0, };
 static FILE* info_stream = NULL;
 static FILE* error_stream = NULL;
 static FILE* debug_stream = NULL;
+static FILE* fileLog = NULL;
 
 static int info_disabled = 0;
 static int error_disabled = 0;
@@ -644,4 +645,22 @@ uint8_t _plist_dict_get_bool(plist_t dict, const char *key)
 		break;
 	}
 	return bval;
+}
+
+void create_log(const char* deviceId) {
+
+	char filename[4086];
+	char logfilename[4086];
+
+	sprintf(logfilename, "%s-restore-flashlog.txt", deviceId);
+	strcpy(filename, logfilename);
+
+	fileLog = fopen(filename, "w");
+	if (fileLog == NULL) {
+		error("write_file: Unable to open file %s\n", filename);
+		return;
+	}
+	idevicerestore_set_info_stream(fileLog);
+	idevicerestore_set_error_stream(fileLog);
+	idevicerestore_set_debug_stream(fileLog);
 }

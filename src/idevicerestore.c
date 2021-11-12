@@ -1650,6 +1650,9 @@ int main(int argc, char* argv[]) {
 					error("ERROR: Could not parse ECID from '%s'\n", optarg);
 					return EXIT_FAILURE;
 				}
+				char* strecid;
+				strecid = strdup(optarg);
+				create_log(strecid);
 			}
 			break;
 
@@ -1660,6 +1663,7 @@ int main(int argc, char* argv[]) {
 				return EXIT_FAILURE;
 			}
 			client->udid = strdup(optarg);
+			create_log(client->udid);
 			break;
 
 		case 't':
