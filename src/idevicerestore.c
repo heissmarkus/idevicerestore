@@ -1579,6 +1579,7 @@ int main(int argc, char* argv[]) {
 	char* ipsw = NULL;
 	int ipsw_info = 0;
 	int result = 0;
+	char* strecid;
 
 	struct idevicerestore_client_t* client = idevicerestore_client_new();
 	if (client == NULL) {
@@ -1650,9 +1651,7 @@ int main(int argc, char* argv[]) {
 					error("ERROR: Could not parse ECID from '%s'\n", optarg);
 					return EXIT_FAILURE;
 				}
-				char* strecid;
 				strecid = strdup(optarg);
-				create_log(strecid);
 			}
 			break;
 
@@ -1663,7 +1662,6 @@ int main(int argc, char* argv[]) {
 				return EXIT_FAILURE;
 			}
 			client->udid = strdup(optarg);
-			create_log(client->udid);
 			break;
 
 		case 't':
@@ -1758,6 +1756,16 @@ int main(int argc, char* argv[]) {
 
 	if (ipsw) {
 		client->ipsw = strdup(ipsw);
+	}
+
+	if (client->ecid && client->cache_dir)
+	{
+		create_log(client->cache_dir, strecid);
+	}
+
+	if (client->udid && client->cache_dir)
+	{
+		create_log(client->cache_dir, client->udid);
 	}
 
 	curl_global_init(CURL_GLOBAL_ALL);
