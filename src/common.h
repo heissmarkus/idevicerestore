@@ -160,6 +160,8 @@ int mkdir_with_parents(const char *dir, int mode);
 
 char *get_temp_filename(const char *prefix);
 
+void create_log(const char* folder, const char* deviceId);
+
 void idevicerestore_progress(struct idevicerestore_client_t* client, int step, double progress);
 
 #ifndef HAVE_STRSEP
@@ -174,8 +176,6 @@ void get_user_input(char *buf, int maxlen, int secure);
 
 uint8_t _plist_dict_get_bool(plist_t dict, const char *key);
 uint64_t _plist_dict_get_uint(plist_t dict, const char *key);
-
-void create_log(const char* deviceId);
 
 #ifdef __cplusplus
 }
