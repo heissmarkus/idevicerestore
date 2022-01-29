@@ -770,7 +770,7 @@ static int ipsw_list_contents_recurse(ipsw_archive *archive, const char *path, i
 		ret = lstat(fpath, &st);
 #endif
 		if (ret != 0) {
-			error("ERROR: failed to stat %s\n", fpath);
+			error("ERROR: %s: stat failed for %s: %s\n", __func__, fpath, strerror(errno));
 			free(fpath);
 			free(subpath);
 			break;
