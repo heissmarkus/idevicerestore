@@ -2860,10 +2860,22 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 	plist_t request = NULL;
 	plist_t response = NULL;
 
-	/* create Timer request */
+	plist_t p_updater_name = plist_dict_get_item(arguments, "MessageArgUpdaterName");
+	const char* s_updater_name = plist_get_string_ptr(p_updater_name, NULL);
+
+	plist_t device_generated_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "ResponseTags");
+	const char* response_ticket = "Cryptex1,Ticket";
+	if (PLIST_IS_ARRAY(device_generated_tags)) {
+		plist_t tag0 = plist_array_get_item(device_generated_tags, 0);
+		if (tag0) {
+			response_ticket = plist_get_string_ptr(tag0, NULL);
+		}
+	}
+
+	/* create Cryptex1 request */
 	request = tss_request_new(NULL);
 	if (request == NULL) {
-		error("ERROR: Unable to create Cryptex1 TSS request\n");
+		error("ERROR: Unable to create %s TSS request\n", s_updater_name);
 		return NULL;
 	}
 
@@ -2875,7 +2887,7 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 	plist_dict_set_item(parameters, "ApProductionMode", plist_new_bool(1));
 	plist_dict_set_item(parameters, "ApSecurityMode", plist_new_bool(1));
 
-	/* add Timer,* tags from info dictionary to parameters */
+	/* add tags from info dictionary to parameters */
 	plist_t device_generated_request = plist_dict_get_item(arguments, "DeviceGeneratedRequest");
 	if (!device_generated_request) {
 		error("ERROR: Could not find DeviceGeneratedRequest in arguments dictionary\n");
@@ -2894,18 +2906,19 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 
 	plist_free(parameters);
 
-	info("Sending Cryptex1 TSS request...\n");
+	info("Sending %s TSS request...\n", s_updater_name);
 	response = tss_request_send(request, client->tss_url);
 	plist_free(request);
 	if (response == NULL) {
-		error("ERROR: Unable to fetch Cryptex1\n");
+		error("ERROR: Unable to fetch %s ticket\n", s_updater_name);
 		return NULL;
 	}
 
-	if (plist_dict_get_item(response, "Cryptex1,Ticket")) {
-		info("Received Cryptex1,Ticket\n");
+	if (plist_dict_get_item(response, response_ticket)) {
+		info("Received %s\n", response_ticket);
 	} else {
-		error("ERROR: No 'Cryptex1,Ticket' in TSS response, this might not work\n");
+		error("ERROR: No '%s' in TSS response, this might not work\n", response_ticket);
+		debug_plist(response);
 	}
 
 	return response;
@@ -3034,10 +3047,10 @@ static int restore_send_firmware_updater_data(restored_client_t restore, struct 
 			error("ERROR: %s: Couldn't get AppleTypeCRetimer firmware data\n", __func__);
 			goto error_out;
 		}
-	} else if (strcmp(s_updater_name, "Cryptex1") == 0) {
+	} else if ((strcmp(s_updater_name, "Cryptex1") == 0) || (strcmp(s_updater_name, "Cryptex1LocalPolicy") == 0)) {
 		fwdict = restore_get_cryptex1_firmware_data(restore, client, build_identity, p_info, arguments);
 		if (fwdict == NULL) {
-			error("ERROR: %s: Couldn't get AppleTypeCRetimer firmware data\n", __func__);
+			error("ERROR: %s: Couldn't get %s firmware data\n", __func__, s_updater_name);
 			goto error_out;
 		}
 	} else {
@@ -3293,7 +3306,7 @@ int extract_macos_variant(plist_t build_identity, char** output)
 	return 0;
 }
 
-int extract_global_manifest(struct idevicerestore_client_t* client, plist_t build_identity, unsigned char** pbuffer, unsigned int* psize)
+int extract_global_manifest(struct idevicerestore_client_t* client, plist_t build_identity, char *variant, unsigned char** pbuffer, unsigned int* psize)
 {
 	plist_t build_info = plist_dict_get_item(build_identity, "Info");
 	if (!build_info) {
@@ -3310,10 +3323,15 @@ int extract_global_manifest(struct idevicerestore_client_t* client, plist_t buil
 	plist_get_string_val(device_class_node, &device_class);
 
 	char *macos_variant = NULL;
-	int ret = extract_macos_variant(build_identity, &macos_variant);
-	if (ret != 0) {
-		free(device_class);
-		return -1;
+	int ret;
+	if (variant) {
+		macos_variant = variant;
+	} else {
+		ret = extract_macos_variant(build_identity, &macos_variant);
+		if (ret != 0) {
+			free(device_class);
+			return -1;
+		}
 	}
 
 	// The path of the global manifest is hardcoded. There's no pointer to in the build manifest.
@@ -3362,7 +3380,7 @@ int restore_send_personalized_boot_object_v3(restored_client_t restore, struct i
 	info("About to send %s...\n", component_name);
 
 	if (strcmp(image_name, "__GlobalManifest__") == 0) {
-		int ret = extract_global_manifest(client, build_identity, &data, &size);
+		int ret = extract_global_manifest(client, build_identity, NULL, &data, &size);
 		if (ret != 0) {
 			return -1;
 		}
@@ -3488,7 +3506,19 @@ int restore_send_source_boot_object_v4(restored_client_t restore, struct idevice
 	info("About to send %s...\n", component_name);
 
 	if (strcmp(image_name, "__GlobalManifest__") == 0) {
-		int ret = extract_global_manifest(client, build_identity, &data, &size);
+		char *variant = NULL;
+		plist_t node = plist_access_path(msg, 2, "Arguments", "Variant");
+		if (!node || plist_get_node_type(node) != PLIST_STRING) {
+			debug("Failed to parse arguments from SourceBootObjectV4 plist\n");
+			return -1;
+		}
+		plist_get_string_val(node, &variant);
+		if (!variant) {
+			debug("Failed to parse arguments from SourceBootObjectV4 as string\n");
+			return -1;
+		}
+
+		int ret = extract_global_manifest(client, build_identity, variant, &data, &size);
 		if (ret != 0) {
 			return -1;
 		}
