@@ -2881,21 +2881,20 @@ static plist_t restore_get_cryptex1_firmware_data(restored_client_t restore, str
 
 	parameters = plist_new_dict();
 
-    /* add manifest for current build_identity to parameters (Cryptex1 will require the manifest in a seperate message) */
 	tss_request_add_common_tags(parameters, build_identity, NULL);
 	plist_dict_remove_item(parameters, "UniqueBuildID");
 
 	plist_t build_identity_tags = plist_access_path(arguments, 2, "DeviceGeneratedTags", "BuildIdentityTags");
 	if (PLIST_IS_ARRAY(build_identity_tags)) {
-	   uint32_t i = 0;
-	   for (i = 0; i < plist_array_get_size(build_identity_tags); i++) {
-	       plist_t node = plist_array_get_item(build_identity_tags, i);
-	       const char* key = plist_get_string_ptr(node, NULL);
-	       plist_t item = plist_dict_get_item(build_identity, key);
-	       if (item) {
-	            plist_dict_set_item(parameters, key, plist_copy(item));
-	       }
-	   }
+		uint32_t i = 0;
+		for (i = 0; i < plist_array_get_size(build_identity_tags); i++) {
+			plist_t node = plist_array_get_item(build_identity_tags, i);
+			const char* key = plist_get_string_ptr(node, NULL);
+			plist_t item = plist_dict_get_item(build_identity, key);
+			if (item) {
+				plist_dict_set_item(parameters, key, plist_copy(item));
+			}
+		}
 	}
 
 	plist_dict_set_item(parameters, "ApProductionMode", plist_new_bool(1));
