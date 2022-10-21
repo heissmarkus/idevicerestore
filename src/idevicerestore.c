@@ -482,17 +482,24 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 		if (dfu_client_new(client) < 0) {
 			return -1;
 		}
-		info("exploiting with limera1n...\n");
-		// TODO: check for non-limera1n device and fail
-		if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
-			error("ERROR: limera1n exploit failed\n");
+
+		if (limera1n_is_supported(client->device)) {
+			info("exploiting with limera1n...\n");
+			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
+				error("ERROR: limera1n exploit failed\n");
+				dfu_client_free(client);
+				return -1;
+			}
 			dfu_client_free(client);
+			info("Device should be in pwned DFU state now.\n");
+
+			return 0;
+		}
+		else {
+			dfu_client_free(client);
+			error("ERROR: This device is not supported by the limera1n exploit");
 			return -1;
 		}
-		dfu_client_free(client);
-		info("Device should be in pwned DFU state now.\n");
-
-		return 0;
 	}
 
 	if (client->flags & FLAG_LATEST) {
@@ -1224,7 +1231,6 @@ int idevicerestore_start(struct idevicerestore_client_t* client)
 				return -1;
 			}
 			info("exploiting with limera1n\n");
-			// TODO: check for non-limera1n device and fail
 			if (limera1n_exploit(client->device, &client->dfu->client) != 0) {
 				error("ERROR: limera1n exploit failed\n");
 				dfu_client_free(client);
