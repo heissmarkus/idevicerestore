@@ -70,6 +70,9 @@ struct dfu_client_t;
 struct normal_client_t;
 struct restore_client_t;
 struct recovery_client_t;
+struct ipsw_archive;
+
+typedef struct ipsw_archive* ipsw_archive_t;
 
 struct idevicerestore_mode_t {
 	int index;
@@ -88,6 +91,7 @@ struct idevicerestore_entry_t {
 
 struct idevicerestore_client_t {
 	int flags;
+	int debug_level;
 	plist_t tss;
 	plist_t tss_localpolicy;
 	plist_t tss_recoveryos_root_ticket;
@@ -101,8 +105,7 @@ struct idevicerestore_client_t {
 	plist_t preflight_info;
 	char* udid;
 	char* srnm;
-	char* ipsw;
-	const char* filesystem;
+	ipsw_archive_t ipsw;
 	struct dfu_client_t* dfu;
 	struct restore_client_t* restore;
 	struct recovery_client_t* recovery;

@@ -35,7 +35,7 @@
 
 #include "endianness.h"
 
-#define AUTH_VERSION "850.0.2"
+#define AUTH_VERSION "914.120.2"
 
 #ifdef WIN32
 #define TSS_CLIENT_VERSION_STRING "libauthinstall_Win-"AUTH_VERSION"" 
@@ -305,6 +305,14 @@ int tss_request_add_ap_img4_tags(plist_t request, plist_t parameters)
 		plist_dict_set_item(request, "UID_MODE", plist_new_bool(0));
 	}
 
+	// FIXME: I didn't understand yet when this value is set, so for now we use a workaround
+	if (plist_dict_get_item(parameters, "ApSikaFuse")) {
+		_plist_dict_copy_item(request, parameters, "Ap,SikaFuse", "ApSikaFuse");
+	} else if (_plist_dict_get_bool(parameters, "RequiresUIDMode")) {
+		// Workaround: We have only seen Ap,SikaFuse together with UID_MODE
+		plist_dict_set_item(request, "Ap,SikaFuse", plist_new_int(0));
+	}
+
 	return 0;
 }
 
@@ -316,8 +324,7 @@ int tss_request_add_ap_img3_tags(plist_t request, plist_t parameters)
 	}
 
 	if (_plist_dict_copy_data(request, parameters, "ApNonce", NULL) < 0) {
-		error("ERROR: Unable to find required ApNonce in parameters\n");
-		return -1;
+		error("WARNING: Unable to find ApNonce in parameters\n");
 	}
 
 	plist_dict_set_item(request, "@APTicket", plist_new_bool(1));
@@ -1160,6 +1167,7 @@ int tss_request_add_rose_tags(plist_t request, plist_t parameters, plist_t overr
 	_plist_dict_copy_bool(request, parameters, "Rap,ProductionMode", NULL);
 	_plist_dict_copy_uint(request, parameters, "Rap,SecurityDomain", NULL);
 	_plist_dict_copy_bool(request, parameters, "Rap,SecurityMode", NULL);
+	_plist_dict_copy_data(request, parameters, "Rap,FdrRootCaDigest", NULL);
 
 	char *comp_name = NULL;
 	plist_dict_iter iter = NULL;
