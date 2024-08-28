@@ -30,15 +30,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <libimobiledevice/libimobiledevice.h>
-#ifdef HAVE_OPENSSL
-#include <openssl/sha.h>
-#else
-#include "sha1.h"
-#define SHA_CTX SHA1_CTX
-#define SHA1_Init SHA1Init
-#define SHA1_Update SHA1Update
-#define SHA1_Final SHA1Final
-#endif
+
+#include <libimobiledevice-glue/sha.h>
 
 #include "asr.h"
 #include "idevicerestore.h"
@@ -47,7 +40,6 @@
 
 #define ASR_VERSION 1
 #define ASR_STREAM_ID 1
-#define ASR_PORT 12345
 #define ASR_BUFFER_SIZE 65536
 #define ASR_FEC_SLICE_STRIDE 40
 #define ASR_PACKETS_PER_FEC 25
@@ -55,7 +47,7 @@
 #define ASR_PAYLOAD_CHUNK_SIZE 131072
 #define ASR_CHECKSUM_CHUNK_SIZE 131072
 
-int asr_open_with_timeout(idevice_t device, asr_client_t* asr)
+int asr_open_with_timeout(idevice_t device, asr_client_t* asr, uint16_t port)
 {
 	int i = 0;
 	int attempts = 10;
@@ -68,9 +60,13 @@ int asr_open_with_timeout(idevice_t device, asr_client_t* asr)
 		return -1;
 	}
 
-	debug("Connecting to ASR\n");
+	if (port == 0) {
+		port = ASR_DEFAULT_PORT;
+	}
+	debug("Connecting to ASR on port %u\n", port);
+
 	for (i = 1; i <= attempts; i++) {
-		device_error = idevice_connect(device, ASR_PORT, &connection);
+		device_error = idevice_connect(device, port, &connection);
 		if (device_error == IDEVICE_E_SUCCESS) {
 			break;
 		}
@@ -216,9 +212,7 @@ int asr_perform_validation(asr_client_t asr, ipsw_file_handle_t file)
 	plist_t payload_info = NULL;
 	int attempts = 0;
 
-	ipsw_file_seek(file, 0, SEEK_END);
-	length = ipsw_file_tell(file);
-	ipsw_file_seek(file, 0, SEEK_SET);
+	length = ipsw_file_size(file);
 
 	payload_info = plist_new_dict();
 	plist_dict_set_item(payload_info, "Port", plist_new_uint(1));
@@ -313,9 +307,14 @@ int asr_handle_oob_data_request(asr_client_t asr, plist_t packet, ipsw_file_hand
 		return -1;
 	}
 
-	ipsw_file_seek(file, oob_offset, SEEK_SET);
-	if (ipsw_file_read(file, oob_data, oob_length) != oob_length) {
-		error("ERROR: Unable to read OOB data from filesystem offset: %s\n", strerror(errno));
+	if (ipsw_file_seek(file, oob_offset, SEEK_SET) < 0) {
+		error("ERROR: Unable to seek to OOB offset 0x%" PRIx64 "\n", oob_offset);
+		free(oob_data);
+		return -1;
+	}
+	int64_t ir = ipsw_file_read(file, oob_data, oob_length);
+	if (ir != oob_length) {
+		error("ERROR: Unable to read OOB data from filesystem offset 0x%" PRIx64 ", oob_length %" PRIu64 ", read returned %" PRIi64"\n", oob_offset, oob_length, ir);
 		free(oob_data);
 		return -1;
 	}
@@ -335,23 +334,17 @@ int asr_send_payload(asr_client_t asr, ipsw_file_handle_t file)
 	uint64_t i, length, bytes = 0;
 	double progress = 0;
 
-	ipsw_file_seek(file, 0, SEEK_END);
-	length = ipsw_file_tell(file);
+	length = ipsw_file_size(file);
 	ipsw_file_seek(file, 0, SEEK_SET);
 
 	data = (char*)malloc(ASR_PAYLOAD_CHUNK_SIZE + 20);
 
-	SHA_CTX sha1;
-
-	if (asr->checksum_chunks) {
-		SHA1_Init(&sha1);
-	}
-
-	int size = 0;
 	i = length;
 	int retry = 3;
 	while(i > 0 && retry >= 0) {
-		size = ASR_PAYLOAD_CHUNK_SIZE;
+		uint32_t size = ASR_PAYLOAD_CHUNK_SIZE;
+		uint32_t sendsize = 0;
+
 		if (i < ASR_PAYLOAD_CHUNK_SIZE) {
 			size = i;
 		}
@@ -362,12 +355,13 @@ int asr_send_payload(asr_client_t asr, ipsw_file_handle_t file)
 			continue;
 		}
 
+		sendsize = size;
 		if (asr->checksum_chunks) {
-			SHA1((unsigned char*)data, size, (unsigned char*)(data+size));
+			sha1((unsigned char*)data, size, (unsigned char*)(data+size));
+			sendsize += 20;
 		}
-
-		if (asr_send_buffer(asr, data, size+20) < 0) {
-			error("ERROR: Unable to send filesystem payload\n");
+		if (asr_send_buffer(asr, data, sendsize) < 0) {
+			error("Unable to send filesystem payload chunk, retrying...\n");
 			retry--;
 			continue;
 		}
@@ -383,5 +377,5 @@ int asr_send_payload(asr_client_t asr, ipsw_file_handle_t file)
 	}
 
 	free(data);
-	return 0;
+	return (i == 0) ? 0 : -1;
 }

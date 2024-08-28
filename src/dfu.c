@@ -27,8 +27,9 @@
 #include <unistd.h>
 #include <libirecovery.h>
 
+#include <libtatsu/tss.h>
+
 #include "dfu.h"
-#include "tss.h"
 #include "recovery.h"
 #include "idevicerestore.h"
 #include "common.h"
@@ -103,19 +104,24 @@ irecv_device_t dfu_get_irecv_device(struct idevicerestore_client_t* client)
 	return device;
 }
 
-int dfu_send_buffer(struct idevicerestore_client_t* client, unsigned char* buffer, unsigned int size)
+int dfu_send_buffer_with_options(struct idevicerestore_client_t* client, unsigned char* buffer, unsigned int size, unsigned int irecv_options)
 {
 	irecv_error_t err = 0;
 
 	info("Sending data (%d bytes)...\n", size);
 
-	err = irecv_send_buffer(client->dfu->client, buffer, size, 1);
+	err = irecv_send_buffer(client->dfu->client, buffer, size, irecv_options);
 	if (err != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to send data: %s\n", irecv_strerror(err));
 		return -1;
 	}
 
 	return 0;
+}
+
+int dfu_send_buffer(struct idevicerestore_client_t* client, unsigned char* buffer, unsigned int size)
+{
+	return dfu_send_buffer_with_options(client, buffer, size, IRECV_SEND_OPT_DFU_NOTIFY_FINISH);
 }
 
 int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_identity, const char* component)
@@ -193,7 +199,7 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 
 	info("Sending %s (%d bytes)...\n", component, size);
 
-	irecv_error_t err = irecv_send_buffer(client->dfu->client, data, size, 1);
+	irecv_error_t err = irecv_send_buffer(client->dfu->client, data, size, IRECV_SEND_OPT_DFU_NOTIFY_FINISH);
 	if (err != IRECV_E_SUCCESS) {
 		error("ERROR: Unable to send %s component: %s\n", component, irecv_strerror(err));
 		free(data);
@@ -201,6 +207,24 @@ int dfu_send_component(struct idevicerestore_client_t* client, plist_t build_ide
 	}
 
 	free(data);
+	return 0;
+}
+
+int dfu_get_bdid(struct idevicerestore_client_t* client, unsigned int* bdid)
+{
+	if(client->dfu == NULL) {
+		if (dfu_client_new(client) < 0) {
+			return -1;
+		}
+	}
+
+	const struct irecv_device_info *device_info = irecv_get_device_info(client->dfu->client);
+	if (!device_info) {
+		return -1;
+	}
+
+	*bdid = device_info->bdid;
+
 	return 0;
 }
 
@@ -222,6 +246,27 @@ int dfu_get_cpid(struct idevicerestore_client_t* client, unsigned int* cpid)
 	return 0;
 }
 
+int dfu_get_prev(struct idevicerestore_client_t* client, unsigned int* prev)
+{
+	if(client->dfu == NULL) {
+		if (dfu_client_new(client) < 0) {
+			return -1;
+		}
+	}
+
+	const struct irecv_device_info *device_info = irecv_get_device_info(client->dfu->client);
+	if (!device_info) {
+		return -1;
+	}
+	char* ptr = strstr(device_info->serial_string, "PREV:");
+	if (ptr) {
+		sscanf(ptr, "PREV:%x", prev);
+		return 0;
+	}
+	return -1;
+}
+
+
 int dfu_is_image4_supported(struct idevicerestore_client_t* client)
 {
 	if(client->dfu == NULL) {
@@ -238,7 +283,36 @@ int dfu_is_image4_supported(struct idevicerestore_client_t* client)
 	return (device_info->ibfl & IBOOT_FLAG_IMAGE4_AWARE);
 }
 
-int dfu_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size)
+int dfu_get_portdfu_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size)
+{
+	if(client->dfu == NULL) {
+		if (dfu_client_new(client) < 0) {
+			return -1;
+		}
+	}
+
+	const struct irecv_device_info *device_info = irecv_get_device_info(client->dfu->client);
+	if (!device_info) {
+		return -1;
+	}
+
+	if (device_info->ap_nonce && device_info->ap_nonce_size > 0) {
+		*nonce = (unsigned char*)malloc(device_info->ap_nonce_size);
+		if (!*nonce) {
+			return -1;
+		}
+		*nonce_size = device_info->ap_nonce_size;
+		// The nonce is backwards, so we have to swap the bytes
+		unsigned int i = 0;
+		for (i = 0; i < *nonce_size; i++) {
+			(*nonce)[(*nonce_size)-1-i] = device_info->ap_nonce[i];
+		}
+	}
+
+	return 0;
+}
+
+int dfu_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size)
 {
 	if(client->dfu == NULL) {
 		if (dfu_client_new(client) < 0) {
@@ -263,7 +337,7 @@ int dfu_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** non
 	return 0;
 }
 
-int dfu_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size)
+int dfu_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size)
 {
 	if(client->dfu == NULL) {
 		if (dfu_client_new(client) < 0) {
@@ -417,7 +491,7 @@ int dfu_enter_recovery(struct idevicerestore_client_t* client, plist_t build_ide
 
 		/* get nonce */
 		unsigned char* nonce = NULL;
-		int nonce_size = 0;
+		unsigned int nonce_size = 0;
 		int nonce_changed = 0;
 		if (dfu_get_ap_nonce(client, &nonce, &nonce_size) < 0) {
 			error("ERROR: Unable to get ApNonce from device!\n");

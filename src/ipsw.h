@@ -33,7 +33,7 @@ extern "C" {
 #include <sys/stat.h>
 
 struct ipsw_archive {
-	struct zip* zip;
+	int zip;
 	char *path;
 };
 typedef struct ipsw_archive* ipsw_archive_t;
@@ -44,17 +44,21 @@ void ipsw_close(ipsw_archive_t ipsw);
 int ipsw_print_info(const char* ipsw);
 
 typedef int (*ipsw_list_cb)(void *ctx, ipsw_archive_t ipsw, const char *name, struct stat *stat);
-typedef int (*ipsw_send_cb)(void *ctx, void *data, size_t size);
+typedef int (*ipsw_send_cb)(void *ctx, void *data, size_t size, size_t done, size_t total_size);
 
 struct ipsw_file_handle {
 	FILE* file;
+	struct zip* zip;
 	struct zip_file* zfile;
+	uint64_t size;
+	int seekable;
 };
 typedef struct ipsw_file_handle* ipsw_file_handle_t;
 
 ipsw_file_handle_t ipsw_file_open(ipsw_archive_t, const char* path);
 void ipsw_file_close(ipsw_file_handle_t handle);
 
+uint64_t ipsw_file_size(ipsw_file_handle_t handle);
 int64_t ipsw_file_read(ipsw_file_handle_t handle, void* buffer, size_t size);
 int ipsw_file_seek(ipsw_file_handle_t handle, int64_t offset, int whence);
 int64_t ipsw_file_tell(ipsw_file_handle_t handle);

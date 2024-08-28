@@ -63,6 +63,7 @@ enum {
 	RESTORE_STEP_FLASH_FW,
 	RESTORE_STEP_FLASH_BB,
 	RESTORE_STEP_FUD,
+	RESTORE_STEP_UPLOAD_IMG,
 	RESTORE_NUM_STEPS
 };
 
@@ -92,8 +93,8 @@ const char* idevicerestore_get_error(void);
 irecv_device_t get_irecv_device(struct idevicerestore_client_t* client);
 int get_ecid(struct idevicerestore_client_t* client, uint64_t* ecid);
 int is_image4_supported(struct idevicerestore_client_t* client);
-int get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
-int get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size);
+int get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size);
+int get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size);
 int get_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);
 int get_local_policy_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);
 int get_recoveryos_root_ticket_tss_response(struct idevicerestore_client_t* client, plist_t build_identity, plist_t* tss);

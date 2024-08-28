@@ -29,8 +29,9 @@
 #include <libimobiledevice/restore.h>
 #include <libimobiledevice/libimobiledevice.h>
 
+#include <libtatsu/tss.h>
+
 #include "idevicerestore.h"
-#include "tss.h"
 #include "img3.h"
 #include "restore.h"
 #include "recovery.h"
@@ -537,7 +538,7 @@ int recovery_is_image4_supported(struct idevicerestore_client_t* client)
 	return (device_info->ibfl & IBOOT_FLAG_IMAGE4_AWARE);
 }
 
-int recovery_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size)
+int recovery_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size)
 {
 	if(client->recovery == NULL) {
 		if (recovery_client_new(client) < 0) {
@@ -562,7 +563,7 @@ int recovery_get_ap_nonce(struct idevicerestore_client_t* client, unsigned char*
 	return 0;
 }
 
-int recovery_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, int* nonce_size)
+int recovery_get_sep_nonce(struct idevicerestore_client_t* client, unsigned char** nonce, unsigned int* nonce_size)
 {
 	if(client->recovery == NULL) {
 		if (recovery_client_new(client) < 0) {
