@@ -81,6 +81,13 @@ static int error_disabled = 0;
 static int debug_disabled = 0;
 
 static FILE* fileLog = NULL;
+static mutex_t log_mutex;
+static thread_once_t init_once = THREAD_ONCE_INIT;
+
+static void _log_init(void)
+{
+	mutex_init(&log_mutex);
+}
 
 void create_log(const char* folder, const char* deviceId) {
 
@@ -95,15 +102,6 @@ void create_log(const char* folder, const char* deviceId) {
 		error("write_file: Unable to open file %s\n", filename);
 		return;
 	}
-	idevicerestore_set_info_stream(fileLog);
-	idevicerestore_set_error_stream(fileLog);
-	idevicerestore_set_debug_stream(fileLog);
-static mutex_t log_mutex;
-static thread_once_t init_once = THREAD_ONCE_INIT;
-
-static void _log_init(void)
-{
-	mutex_init(&log_mutex);
 }
 
 void info(const char* format, ...)
