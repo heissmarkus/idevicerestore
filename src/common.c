@@ -102,6 +102,10 @@ void create_log(const char* folder, const char* deviceId) {
 		error("write_file: Unable to open file %s\n", filename);
 		return;
 	}
+
+	idevicerestore_set_info_stream(fileLog);
+	idevicerestore_set_error_stream(fileLog);
+	idevicerestore_set_debug_stream(fileLog);	
 }
 
 void info(const char* format, ...)
@@ -115,8 +119,8 @@ void info(const char* format, ...)
 	if (info_stream) fflush(info_stream);
 
 	va_end(vargs);
-	fflush(info_stream?info_stream:stdout);
 	fflush(stdout);
+	fflush(info_stream?info_stream:stdout);
 	mutex_unlock(&log_mutex);
 }
 
@@ -134,8 +138,8 @@ void error(const char* format, ...)
 		if (error_stream) fflush(error_stream);
 	}
 	va_end(vargs2);
-	fflush(error_stream?error_stream:stderr);
 	fflush(stdout);
+	fflush(error_stream?error_stream:stderr);
 	mutex_unlock(&log_mutex);
 }
 
@@ -152,8 +156,8 @@ void debug(const char* format, ...)
 	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	if (debug_stream) fflush(debug_stream);
 	va_end(vargs);
-	fflush(debug_stream?debug_stream:stderr);
 	fflush(stdout);
+	fflush(debug_stream?debug_stream:stderr);
 	mutex_unlock(&log_mutex);
 }
 
