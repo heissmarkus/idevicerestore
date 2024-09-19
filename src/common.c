@@ -116,6 +116,7 @@ void info(const char* format, ...)
 
 	va_end(vargs);
 	fflush(info_stream?info_stream:stdout);
+	fflush(stdout);
 	mutex_unlock(&log_mutex);
 }
 
@@ -134,6 +135,7 @@ void error(const char* format, ...)
 	}
 	va_end(vargs2);
 	fflush(error_stream?error_stream:stderr);
+	fflush(stdout);
 	mutex_unlock(&log_mutex);
 }
 
@@ -151,6 +153,7 @@ void debug(const char* format, ...)
 	if (debug_stream) fflush(debug_stream);
 	va_end(vargs);
 	fflush(debug_stream?debug_stream:stderr);
+	fflush(stdout);
 	mutex_unlock(&log_mutex);
 }
 
