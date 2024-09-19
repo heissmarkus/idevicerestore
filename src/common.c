@@ -115,8 +115,7 @@ void info(const char* format, ...)
 	if (info_stream) fflush(info_stream);
 
 	va_end(vargs);
-	
-	fflush(stdout);
+	fflush(info_stream?info_stream:stdout);
 	mutex_unlock(&log_mutex);
 }
 
@@ -134,7 +133,7 @@ void error(const char* format, ...)
 		if (error_stream) fflush(error_stream);
 	}
 	va_end(vargs2);
-	fflush(stdout);
+	fflush(error_stream?error_stream:stderr);
 	mutex_unlock(&log_mutex);
 }
 
@@ -151,7 +150,7 @@ void debug(const char* format, ...)
 	vfprintf((debug_stream) ? debug_stream : stderr, format, vargs);
 	if (debug_stream) fflush(debug_stream);
 	va_end(vargs);
-	fflush(stdout);
+	fflush(debug_stream?debug_stream:stderr);
 	mutex_unlock(&log_mutex);
 }
 
