@@ -2038,6 +2038,7 @@ int main(int argc, char* argv[])
 	}
 
 	// SECURAZE
+	/*
 	if (client->ecid && client->cache_dir)
 	{
 		create_log(client->cache_dir, strecid);
@@ -2047,6 +2048,7 @@ int main(int argc, char* argv[])
 	{
 		create_log(client->cache_dir, client->udid);
 	}
+	*/
 
 	curl_global_init(CURL_GLOBAL_ALL);
 
