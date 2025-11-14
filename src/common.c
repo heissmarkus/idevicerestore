@@ -98,6 +98,37 @@ static void _log_init(void)
 	mutex_init(&log_mutex);
 }
 
+void idevicerestore_set_info_stream(FILE* strm)
+{
+	if (strm) {
+		info_disabled = 0;
+		info_stream = strm;
+	} else {
+		info_disabled = 1;
+	}
+}
+
+void idevicerestore_set_error_stream(FILE* strm)
+{
+	if (strm) {
+		error_disabled = 0;
+		error_stream = strm;
+	} else {
+		error_disabled = 1;
+	}
+}
+
+void idevicerestore_set_debug_stream(FILE* strm)
+{
+	if (strm) {
+		debug_disabled = 0;
+		debug_stream = strm;
+	} else {
+		debug_disabled = 1;
+	}
+}
+
+
 void create_log(const char* folder, const char* deviceId) {
 
 	char filename[4086];
@@ -108,7 +139,7 @@ void create_log(const char* folder, const char* deviceId) {
 
 	fileLog = fopen(filename, "w");
 	if (fileLog == NULL) {
-		error("write_file: Unable to open file %s\n", filename);
+		logger(LL_ERROR, "write_file: Unable to open file %s\n", filename);
 		return;
 	}
 
@@ -168,36 +199,6 @@ void debug(const char* format, ...)
 	fflush(stdout);
 	fflush(debug_stream?debug_stream:stderr);
 	mutex_unlock(&log_mutex);
-}
-
-void idevicerestore_set_info_stream(FILE* strm)
-{
-	if (strm) {
-		info_disabled = 0;
-		info_stream = strm;
-	} else {
-		info_disabled = 1;
-	}
-}
-
-void idevicerestore_set_error_stream(FILE* strm)
-{
-	if (strm) {
-		error_disabled = 0;
-		error_stream = strm;
-	} else {
-		error_disabled = 1;
-	}
-}
-
-void idevicerestore_set_debug_stream(FILE* strm)
-{
-	if (strm) {
-		debug_disabled = 0;
-		debug_stream = strm;
-	} else {
-		debug_disabled = 1;
-	}
 }
 
 const char* idevicerestore_get_error(void)
